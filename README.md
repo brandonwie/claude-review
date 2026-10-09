@@ -30,10 +30,32 @@ flowchart LR
 
 ## Token routing
 
-Work repositories (owner other than `brandonwie`) keep
-`CLAUDE_CODE_OAUTH_TOKEN` in an environment named `brandonwie`. Personal
-repositories keep it as a repository secret. The shared workflows pick the
-environment from the repository owner, so every stub is identical.
+Every stub is identical; the shared workflows pick the token from the
+repository owner and the commenter.
+
+- **Personal repositories** (owner `brandonwie`): only `brandonwie`'s
+  `@claude review` runs, with the repository secret.
+- **Work repositories** (any other owner): each person reviews with their own
+  token, in an environment named after their GitHub login (`brandonwie` for
+  me). A comment from someone without that environment gets a PR comment
+  explaining the setup and no review, so nobody's comment ever spends another
+  person's token. The general `@claude` assistant stays `brandonwie`-only.
+
+To let a teammate review in a work repository, a repository admin creates the
+environment named after the teammate's login, limited to `main`, and the
+teammate's token goes into it:
+
+```bash
+R=<owner>/<repo> L=<teammate-login>
+echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' \
+  | gh api -X PUT repos/$R/environments/$L --input -
+gh api -X POST repos/$R/environments/$L/deployment-branch-policies -f name=main -f type=branch
+gh secret set CLAUDE_CODE_OAUTH_TOKEN --env $L --repo $R   # the teammate pastes their token
+```
+
+Environment secrets need repository admin rights to set, and nobody can read
+them back. Anyone who can push a workflow to `main` can use any environment
+there, so protect `main` with required reviews.
 
 ## One token, copied everywhere
 

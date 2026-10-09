@@ -5,11 +5,15 @@ name: Claude Code Review
 # effort, trigger gate, token routing, permissions, tool allowlist and prompt
 # live here, so a commit to main reaches every caller on its next review.
 #
-# Trigger: a pull request comment containing "@claude review" by brandonwie.
-# Token routing: work repositories (owner other than brandonwie) read
-# CLAUDE_CODE_OAUTH_TOKEN from their `brandonwie` environment; personal
-# repositories read the repository secret. Either way the stub passes the
-# secret, or the called job sees an empty token.
+# Trigger: a pull request comment containing "@claude review".
+# Personal repositories (owner brandonwie): only brandonwie's comment runs, with
+# the repository secret.
+# Work repositories (any other owner): each commenter reviews with their OWN
+# token, kept in an environment named after their GitHub login (brandonwie's is
+# `brandonwie`); nobody's comment can reach anyone else's token. The token-env
+# job checks that environment exists first; without one, it comments on the PR
+# instead of letting GitHub auto-create an empty environment.
+# Either way the stub passes the secret, or the called job sees an empty token.
 #
 # What to review does not live here. Each caller keeps its own review standard
 # in REVIEW.md (input `review_file`), shared by people, Claude, Codex and any
@@ -35,20 +39,54 @@ on:
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         description: >-
-          Pass it from every stub. The `brandonwie` environment secret takes
-          precedence in work repositories.
+          Pass it from every stub. In work repositories the commenter's
+          environment secret takes precedence.
         required: false
 
 jobs:
-  review:
+  token-env:
+    # Work repositories only: does the commenter have a token environment?
     if: >-
       github.event_name == 'issue_comment'
       && github.event.issue.pull_request
       && contains(github.event.comment.body, '@claude review')
-      && github.event.comment.user.login == 'brandonwie'
+      && github.repository_owner != 'brandonwie'
+      && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOGIN: ${{ github.event.comment.user.login }}
+          PR: ${{ github.event.issue.number }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/environments/$LOGIN" >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "@$LOGIN Claude review runs with your own token here. Ask a repository admin to create the environment \`$LOGIN\` (deployment branches: \`main\` only) holding your \`CLAUDE_CODE_OAUTH_TOKEN\` from \`claude setup-token\`."
+          fi
+
+  review:
+    needs: token-env
+    if: >-
+      always()
+      && github.event_name == 'issue_comment'
+      && github.event.issue.pull_request
+      && contains(github.event.comment.body, '@claude review')
+      && (
+        (github.repository_owner == 'brandonwie' && github.event.comment.user.login == 'brandonwie')
+        || (github.repository_owner != 'brandonwie' && needs.token-env.outputs.ready == 'true')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ github.repository_owner != 'brandonwie' && 'brandonwie' || '' }}
+    environment: ${{ github.repository_owner != 'brandonwie' && github.event.comment.user.login || '' }}
     # A caller job must grant at least these; a called job can only narrow them.
     permissions:
       contents: read
@@ -61,7 +99,7 @@ jobs:
       - name: Validate Claude token
         env:
           CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          ENV_NAME: ${{ github.repository_owner != 'brandonwie' && 'brandonwie' || '' }}
+          ENV_NAME: ${{ github.repository_owner != 'brandonwie' && github.event.comment.user.login || '' }}
         run: |
           if [ -z "$CLAUDE_TOKEN" ]; then
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is empty (environment: '${ENV_NAME:-none}'). Pass it in the stub's secrets: block, and set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $GITHUB_REPOSITORY${ENV_NAME:+ --env $ENV_NAME}"
