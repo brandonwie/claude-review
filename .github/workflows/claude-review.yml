@@ -32,12 +32,6 @@ on:
           the default branch.
         type: string
         default: REVIEW.md
-      environment:
-        description: >-
-          Deprecated, ignored once callers stop passing it. Overrides the
-          owner-based environment.
-        type: string
-        default: ""
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         description: >-
@@ -54,7 +48,7 @@ jobs:
       && github.event.comment.user.login == 'brandonwie'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.environment || (github.repository_owner != 'brandonwie' && 'brandonwie' || '') }}
+    environment: ${{ github.repository_owner != 'brandonwie' && 'brandonwie' || '' }}
     # A caller job must grant at least these; a called job can only narrow them.
     permissions:
       contents: read
@@ -67,7 +61,7 @@ jobs:
       - name: Validate Claude token
         env:
           CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          ENV_NAME: ${{ inputs.environment || (github.repository_owner != 'brandonwie' && 'brandonwie' || '') }}
+          ENV_NAME: ${{ github.repository_owner != 'brandonwie' && 'brandonwie' || '' }}
         run: |
           if [ -z "$CLAUDE_TOKEN" ]; then
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is empty (environment: '${ENV_NAME:-none}'). Pass it in the stub's secrets: block, and set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $GITHUB_REPOSITORY${ENV_NAME:+ --env $ENV_NAME}"
