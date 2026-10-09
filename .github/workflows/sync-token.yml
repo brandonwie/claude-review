@@ -1,0 +1,28 @@
+name: Sync token
+
+# Copies this repository's CLAUDE_CODE_OAUTH_TOKEN secret, the one place to
+# update it, into every repository that calls the shared workflows here. Run it
+# after updating the secret. SYNC_GH_TOKEN must be allowed to write Actions
+# secrets in every caller. Logs are public, so the script prints counts only.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Copy the token to every caller
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_GH_TOKEN }}
+          CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ] || [ -z "$CLAUDE_TOKEN" ]; then
+            echo "::error::Set SYNC_GH_TOKEN and CLAUDE_CODE_OAUTH_TOKEN in this repository first."
+            exit 1
+          fi
+          printf '%s' "$CLAUDE_TOKEN" | bash scripts/sync-token.sh

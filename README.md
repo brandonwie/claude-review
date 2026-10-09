@@ -12,11 +12,12 @@ changes the action version, model, trigger, token routing and prompt for every
 repository that calls them. Each repository keeps a short stub and its own
 `REVIEW.md`.
 
-| Workflow                                                            | Runs when                                                     |
-| ------------------------------------------------------------------- | ------------------------------------------------------------- |
-| [`claude-review.yml`](.github/workflows/claude-review.yml)          | `brandonwie` comments `@claude review` on a pull request      |
-| [`claude-assistant.yml`](.github/workflows/claude-assistant.yml)    | `brandonwie` mentions `@claude` anywhere else (optional stub) |
-| [`pin-check.yml`](.github/workflows/pin-check.yml) (this repo only) | every push; fails when the two workflows pin different SHAs   |
+| Workflow                                                              | Runs when                                                     |
+| --------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`claude-review.yml`](.github/workflows/claude-review.yml)            | `brandonwie` comments `@claude review` on a pull request      |
+| [`claude-assistant.yml`](.github/workflows/claude-assistant.yml)      | `brandonwie` mentions `@claude` anywhere else (optional stub) |
+| [`pin-check.yml`](.github/workflows/pin-check.yml) (this repo only)   | every push; fails when the two workflows pin different SHAs   |
+| [`sync-token.yml`](.github/workflows/sync-token.yml) (this repo only) | manual; copies the token here into every caller               |
 
 ```mermaid
 flowchart LR
@@ -33,6 +34,27 @@ Work repositories (owner other than `brandonwie`) keep
 `CLAUDE_CODE_OAUTH_TOKEN` in an environment named `brandonwie`. Personal
 repositories keep it as a repository secret. The shared workflows pick the
 environment from the repository owner, so every stub is identical.
+
+## One token, copied everywhere
+
+GitHub has no account-level Actions secret, and a called workflow cannot read
+secrets of the repository that hosts it (a 2026-10-09 probe read an empty
+value, with and without `secrets: inherit`). So each caller needs its own copy,
+and this repository keeps the one copy you edit:
+
+1. Put the token (from `claude setup-token`) in this repository's
+   `CLAUDE_CODE_OAUTH_TOKEN` secret, for example
+   `op read 'op://<vault>/<item>/credential' | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo brandonwie/claude-review`.
+2. Run **Sync token** (`gh workflow run sync-token.yml --repo brandonwie/claude-review`).
+   [`scripts/sync-token.sh`](scripts/sync-token.sh) finds every repository of
+   `brandonwie` and `playtag-dev` whose workflows use this repository, then
+   writes the token to its repository secret (personal) or `brandonwie`
+   environment (work). The environment must exist. Logs show counts only.
+
+The job authenticates with `SYNC_GH_TOKEN`, a personal access token that can
+write Actions secrets in every caller (classic token with the `repo` scope, so
+one token covers both owners). Locally, the same script works with your `gh`
+login: `op read '…' | scripts/sync-token.sh`, or `--dry-run` to list callers.
 
 ## Use it in a repository
 
