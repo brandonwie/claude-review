@@ -41,16 +41,13 @@ repository owner and the commenter.
   explaining the setup and no review, so nobody's comment ever spends another
   person's token. The general `@claude` assistant stays `brandonwie`-only.
 
-To let a teammate review in a work repository, a repository admin creates the
-environment named after the teammate's login, limited to `main`, and the
-teammate's token goes into it:
+To let a teammate review in a work repository, a repository admin runs
+[`scripts/add-reviewer.sh`](scripts/add-reviewer.sh). It creates the
+environment named after the teammate's login, limits it to `main`, and stores
+the token the teammate pastes at the hidden prompt:
 
 ```bash
-R=<owner>/<repo> L=<teammate-login>
-echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' \
-  | gh api -X PUT repos/$R/environments/$L --input -
-gh api -X POST repos/$R/environments/$L/deployment-branch-policies -f name=main -f type=branch
-gh secret set CLAUDE_CODE_OAUTH_TOKEN --env $L --repo $R   # the teammate pastes their token
+scripts/add-reviewer.sh playtag-dev/mono-web <teammate-login>
 ```
 
 Environment secrets need repository admin rights to set, and nobody can read
