@@ -83,3 +83,7 @@ model or effort in `claude_args`.
   token.
 - An environment secret reaches the review only through the `environment`
   input; a stub job cannot set `environment` itself.
+- Keep the `secrets:` line even when the token is an environment secret. A
+  probe on 2026-10-09 showed the called job reads the environment secret when
+  the stub passes `CLAUDE_CODE_OAUTH_TOKEN`, and an empty value when it does
+  not. An empty `environment` input runs the job with no environment.

@@ -109,8 +109,8 @@ jobs:
                (confirmed: true), in the finding format the standard sets.
             4. Put the summary in your tracking comment and post no other
                top-level comment. End the summary with exactly one verdict
-               line: `Verdict: ready to merge` when no finding should block
-               the merge, otherwise `Verdict: changes requested`.
+               line: `Verdict: ready to merge` only when you posted no
+               findings, otherwise `Verdict: changes requested`.
 
             This is a review only: do not edit files, commit or push.
           # Review-only: deny the edit and commit tools tag mode grants by default.
