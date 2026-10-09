@@ -108,6 +108,12 @@ jobs:
 | CodeRabbit                   | `.coderabbit.yaml`: `inheritance: true` and `code_guidelines.filePatterns`   |
 | Codex (`@codex review`)      | a `## Code Review Rules` section in a real root `AGENTS.md` that points here |
 
+Codex has no setting for the review file name. Where a repository keeps a
+fuller local Codex profile, put it in a git-ignored `AGENTS.override.md`: local
+Codex reads that file before `AGENTS.md`, and hosted review sees only the
+committed pointer. Company repositories that forbid agent files get no
+`AGENTS.md` at all.
+
 Sources:
 [Claude Code Review](https://code.claude.com/docs/en/code-review),
 [Copilot code review](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review),
