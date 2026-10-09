@@ -2,8 +2,14 @@ name: Claude Code Review
 
 # Single source of truth for the "@claude review" PR review job. Each calling
 # repository keeps only a trigger stub (see README.md). The action pin, model,
-# effort, trigger gate, permissions, tool allowlist and prompt live here, so a
-# commit to main reaches every caller on its next review.
+# effort, trigger gate, token routing, permissions, tool allowlist and prompt
+# live here, so a commit to main reaches every caller on its next review.
+#
+# Trigger: a pull request comment containing "@claude review" by brandonwie.
+# Token routing: work repositories (owner other than brandonwie) read
+# CLAUDE_CODE_OAUTH_TOKEN from their `brandonwie` environment; personal
+# repositories read the repository secret. Either way the stub passes the
+# secret, or the called job sees an empty token.
 #
 # What to review does not live here. Each caller keeps its own review standard
 # in REVIEW.md (input `review_file`), shared by people, Claude, Codex and any
@@ -13,6 +19,9 @@ name: Claude Code Review
 # Security: the comment body appears only in the job-level `if:` expression.
 # It is never interpolated into a shell command or the prompt. Inputs come from
 # the caller's workflow file, which only maintainers can change.
+#
+# Keep the claude-code-action and checkout pins identical to
+# claude-assistant.yml; pin-check.yml fails the push otherwise.
 
 on:
   workflow_call:
@@ -25,21 +34,15 @@ on:
         default: REVIEW.md
       environment:
         description: >-
-          Environment that holds CLAUDE_CODE_OAUTH_TOKEN. Empty uses the
-          repository secret the caller passes.
+          Deprecated, ignored once callers stop passing it. Overrides the
+          owner-based environment.
         type: string
         default: ""
-      allowed_users:
-        description: >-
-          Comma-separated GitHub logins (no spaces) whose "@claude review"
-          comment starts a review.
-        type: string
-        default: brandonwie
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         description: >-
-          Repository secret. An environment secret of the same name takes
-          precedence when `environment` is set.
+          Pass it from every stub. The `brandonwie` environment secret takes
+          precedence in work repositories.
         required: false
 
 jobs:
@@ -48,10 +51,10 @@ jobs:
       github.event_name == 'issue_comment'
       && github.event.issue.pull_request
       && contains(github.event.comment.body, '@claude review')
-      && contains(format(',{0},', inputs.allowed_users), format(',{0},', github.event.comment.user.login))
+      && github.event.comment.user.login == 'brandonwie'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment || (github.repository_owner != 'brandonwie' && 'brandonwie' || '') }}
     # A caller job must grant at least these; a called job can only narrow them.
     permissions:
       contents: read
@@ -64,10 +67,10 @@ jobs:
       - name: Validate Claude token
         env:
           CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          ENV_NAME: ${{ inputs.environment }}
+          ENV_NAME: ${{ inputs.environment || (github.repository_owner != 'brandonwie' && 'brandonwie' || '') }}
         run: |
           if [ -z "$CLAUDE_TOKEN" ]; then
-            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is empty (environment: '${ENV_NAME:-none}'). Set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $GITHUB_REPOSITORY${ENV_NAME:+ --env $ENV_NAME}"
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is empty (environment: '${ENV_NAME:-none}'). Pass it in the stub's secrets: block, and set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $GITHUB_REPOSITORY${ENV_NAME:+ --env $ENV_NAME}"
             exit 1
           fi
 
@@ -78,7 +81,7 @@ jobs:
 
       - name: Run Claude Code review
         # Latest release when pinned: v1.0.247 (2026-10-08). To update, pin the
-        # new release's commit SHA here; every caller picks it up.
+        # new release's commit SHA here and in claude-assistant.yml.
         uses: anthropics/claude-code-action@2dca132ff0e0c4094ce6048b422c6915a071210b # v1.0.247
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
