@@ -70,7 +70,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "@$LOGIN Claude review runs with your own token here. Ask a repository admin to create the environment \`$LOGIN\` (deployment branches: \`main\` only) holding your \`CLAUDE_CODE_OAUTH_TOKEN\` from \`claude setup-token\`."
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "@$LOGIN Claude review runs with your own token here. Ask a repository admin to run \`scripts/add-reviewer.sh $GITHUB_REPOSITORY $LOGIN\` from https://github.com/brandonwie/claude-review: it creates the environment \`$LOGIN\` (deployment branches: \`main\` only) and stores the \`CLAUDE_CODE_OAUTH_TOKEN\` you create with \`claude setup-token\`."
           fi
 
   review:

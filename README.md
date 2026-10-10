@@ -1,7 +1,7 @@
 ---
 tags: [personal, reference]
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
 status: active
 ---
 
@@ -42,9 +42,10 @@ repository owner and the commenter.
   person's token. The general `@claude` assistant stays `brandonwie`-only.
 
 To let a teammate review in a work repository, a repository admin runs
-[`scripts/add-reviewer.sh`](scripts/add-reviewer.sh). It creates the
-environment named after the teammate's login, limits it to `main`, and stores
-the token the teammate pastes at the hidden prompt:
+[`scripts/add-reviewer.sh`](scripts/add-reviewer.sh) from a clone of this
+repository; the PR comment a teammate gets names the exact command. It creates
+the environment named after the teammate's login, limits it to `main`, and
+stores the token the teammate pastes at the hidden prompt:
 
 ```bash
 scripts/add-reviewer.sh playtag-dev/mono-web <teammate-login>
