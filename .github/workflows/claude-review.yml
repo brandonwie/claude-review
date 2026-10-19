@@ -111,6 +111,22 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Resolve PR head commit
+        # The issue_comment event's SHA is the base branch, so name the PR head
+        # the review covers from the API, not from the model.
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid)
+          if ! printf '%s' "$sha" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "::error::Could not resolve the head commit of PR $PR (got '$sha')"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code review
         # Latest release when pinned: v1.0.247 (2026-10-08). To update, pin the
         # new release's commit SHA here and in claude-assistant.yml.
@@ -124,6 +140,7 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.issue.number }}
+            REVIEWED HEAD: ${{ steps.head.outputs.sha }}
             REVIEW STANDARD: ${{ inputs.review_file }}
 
             Review this pull request.
@@ -143,9 +160,10 @@ jobs:
                `mcp__github_inline_comment__create_inline_comment`
                (confirmed: true), in the finding format the standard sets.
             4. Put the summary in your tracking comment and post no other
-               top-level comment. End the summary with exactly one verdict
-               line: `Verdict: ready to merge` only when you posted no
-               findings, otherwise `Verdict: changes requested`.
+               top-level comment. End the summary with exactly these two
+               lines: `Reviewed head: <the REVIEWED HEAD value above>`, then
+               one verdict line: `Verdict: ready to merge` only when you
+               posted no findings, otherwise `Verdict: changes requested`.
 
             This is a review only: do not edit files, commit or push.
           # Review-only: deny the edit and commit tools tag mode grants by default.
